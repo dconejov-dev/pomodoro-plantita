@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pomodoro Plantita</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --card: #fffdf8;
+    --ink: #2b2a26;
+    --muted: #7a7568;
+    --accent: #3f8f5a;
+    --accent-ink: #ffffff;
+    --break: #4a7fb5;
+    --border: #e3ddd0;
+    --pot: #c56a3d;
+    --pot-dark: #a4532b;
+    --soil: #5b3a24;
+    --stem: #4c9a5e;
+    --leaf: #5fb571;
+    --petal: #f08aa6;
+    --center: #f7c948;
+    --wilt: #a39469;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1c1a; --card: #232623; --ink: #ece9e1; --muted: #a09b8e;
+      --accent: #5fb571; --accent-ink: #10150f; --break: #6fa3d8; --border: #363a35;
+      --soil: #3d2818; --wilt: #8a7d58;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1c1a; --card: #232623; --ink: #ece9e1; --muted: #a09b8e;
+    --accent: #5fb571; --accent-ink: #10150f; --break: #6fa3d8; --border: #363a35;
+    --soil: #3d2818; --wilt: #8a7d58;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  main { width: 100%; max-width: 440px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; text-align: center; }
+  .sub { text-align: center; color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    padding: 20px; text-align: center;
+  }
+  .modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 8px; }
+  .mode {
+    font: inherit; font-size: .85rem; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .mode.active { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  svg.plant { width: 220px; height: 240px; display: block; margin: 0 auto; }
+  .plant * { transition: all .6s ease; }
+  #time { font-size: 3.4rem; font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: -1px; margin: 4px 0; }
+  #status { color: var(--muted); min-height: 1.4em; margin-bottom: 16px; }
+  .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .5s linear; }
+  body.on-break .bar > div { background: var(--break); }
+  .controls { display: flex; gap: 10px; justify-content: center; }
+  .btn {
+    font: inherit; font-weight: 600; padding: 12px 22px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--ink); min-width: 110px;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  body.on-break .btn.primary { background: var(--break); border-color: var(--break); }
+  .btn:focus-visible, .mode:focus-visible { outline: 3px solid var(--break); outline-offset: 2px; }
+  .garden { margin-top: 20px; }
+  .garden h2 { font-size: .95rem; margin: 0 0 8px; color: var(--muted); font-weight: 500; }
+  #flowers { font-size: 1.6rem; min-height: 2rem; letter-spacing: 4px; word-break: break-all; }
+  .stats { display: flex; justify-content: space-around; margin-top: 12px; color: var(--muted); font-size: .9rem; }
+  .stats b { display: block; color: var(--ink); font-size: 1.3rem; }
+  @keyframes sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  #plantGroup { transform-origin: 110px 190px; transform-box: view-box; }
+  .swaying { animation: sway 3s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .swaying { animation: none; } .plant * { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>🌱 Pomodoro Plantita</h1>
+  <p class="sub">Concéntrate y tu planta crece. Abandona y se marchita.</p>
+
+  <section class="card">
+    <div class="modes" role="group" aria-label="Duración">
+      <button class="mode active" data-min="25">25 min</button>
+      <button class="mode" data-min="50">50 min</button>
+      <button class="mode" data-min="0.1" title="Para probar">Demo 6 s</button>
+    </div>
+
+    <svg class="plant" viewBox="0 0 220 240" aria-hidden="true">
+      <g id="plantGroup" class="swaying">
+        <!-- tallo: se dibuja desde abajo según el progreso -->
+        <path id="stem" d="M110 190 C 108 160, 114 130, 110 60" fill="none" stroke="var(--stem)" stroke-width="6" stroke-linecap="round"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+        <ellipse id="leaf1" cx="92" cy="165" rx="18" ry="8" fill="var(--leaf)" style="transform-origin:110px 168px"/>
+        <ellipse id="leaf2" cx="128" cy="140" rx="18" ry="8" fill="var(--leaf)" style="transform-origin:110px 143px"/>
+        <ellipse id="leaf3" cx="93" cy="112" rx="16" ry="7" fill="var(--leaf)" style="transform-origin:110px 115px"/>
+        <ellipse id="leaf4" cx="127" cy="88" rx="15" ry="7" fill="var(--leaf)" style="transform-origin:110px 91px"/>
+        <g id="flower" style="transform-origin:110px 60px">
+          <circle cx="110" cy="44" r="12" fill="var(--petal)"/>
+          <circle cx="126" cy="56" r="12" fill="var(--petal)"/>
+          <circle cx="120" cy="74" r="12" fill="var(--petal)"/>
+          <circle cx="100" cy="74" r="12" fill="var(--petal)"/>
+          <circle cx="94" cy="56" r="12" fill="var(--petal)"/>
+          <circle cx="110" cy="60" r="9" fill="var(--center)"/>
+        </g>
+      </g>
+      <!-- maceta -->
+      <ellipse cx="110" cy="190" rx="46" ry="8" fill="var(--soil)"/>
+      <path d="M62 188 L158 188 L148 236 L72 236 Z" fill="var(--pot)"/>
+      <rect x="58" y="182" width="104" height="14" rx="4" fill="var(--pot-dark)"/>
+    </svg>
+
+    <div id="time">25:00</div>
+    <div id="status">Lista para plantar una semilla</div>
+    <div class="bar"><div id="progress"></div></div>
+
+    <div class="controls">
+      <button class="btn primary" id="startBtn">Empezar</button>
+      <button class="btn" id="giveUpBtn" disabled>Rendirse</button>
+    </div>
+  </section>
+
+  <section class="card garden">
+    <h2>Tu jardín de hoy</h2>
+    <div id="flowers" aria-live="polite"></div>
+    <div class="stats">
+      <div><b id="countToday">0</b>sesiones hoy</div>
+      <div><b id="minutesToday">0</b>minutos</div>
+      <div><b id="streak">0</b>días de racha</div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const els = {
+    time: $('time'), status: $('status'), progress: $('progress'),
+    start: $('startBtn'), giveUp: $('giveUpBtn'),
+    stem: $('stem'), leaves: [$('leaf1'), $('leaf2'), $('leaf3'), $('leaf4')],
+    flower: $('flower'), group: $('plantGroup'),
+    flowers: $('flowers'), count: $('countToday'), minutes: $('minutesToday'), streak: $('streak'),
+  };
+  const leafAngles = [-30, 30, -25, 25];
+  const leafAt = [0.15, 0.35, 0.55, 0.75];   // progreso en que brota cada hoja
+  const BREAK_MIN = 5;
+
+  let focusMin = 25;
+  let phase = 'idle';          // idle | focus | break | paused
+  let pausedFrom = null;       // fase que estaba en pausa
+  let endAt = 0, remainingMs = focusMin * 60000, totalMs = focusMin * 60000;
+  let tick = null;
+
+  // ---------- almacenamiento (tolerante a fallos) ----------
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+  function load() {
+    try { return JSON.parse(localStorage.getItem('plantita') || '{}'); } catch { return {}; }
+  }
+  function save(d) { try { localStorage.setItem('plantita', JSON.stringify(d)); } catch {} }
+  let data = load();
+  data.days = data.days || {};
+
+  function streakDays() {
+    let n = 0; const d = new Date();
+    if (!data.days[todayKey()]) d.setDate(d.getDate() - 1); // la racha sigue viva si aún no has hecho hoy
+    while (data.days[d.toISOString().slice(0, 10)]?.count) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function renderGarden() {
+    const day = data.days[todayKey()] || { count: 0, minutes: 0, wilted: 0, log: '' };
+    els.flowers.textContent = day.log || '—';
+    els.count.textContent = day.count;
+    els.minutes.textContent = Math.round(day.minutes);
+    els.streak.textContent = streakDays();
+  }
+  function record(kind) {
+    const k = todayKey();
+    const day = data.days[k] = data.days[k] || { count: 0, minutes: 0, wilted: 0, log: '' };
+    if (kind === 'bloom') {
+      day.count++; day.minutes += focusMin;
+      day.log += ['🌸', '🌷', '🌻', '🌼', '🌺'][day.count % 5];
+    } else { day.wilted++; day.log += '🥀'; }
+    save(data); renderGarden();
+  }
+
+  // ---------- planta ----------
+  function drawPlant(p, wilted = false) {
+    els.stem.setAttribute('stroke-dashoffset', 100 - Math.min(p / 0.9, 1) * 100);
+    els.leaves.forEach((leaf, i) => {
+      const s = Math.max(0, Math.min((p - leafAt[i]) / 0.1, 1));
+      leaf.style.transform = `rotate(${leafAngles[i]}deg) scale(${s})`;
+    });
+    const f = Math.max(0, Math.min((p - 0.9) / 0.1, 1));
+    els.flower.style.transform = `scale(${f})`;
+    els.stem.setAttribute('stroke', wilted ? 'var(--wilt)' : 'var(--stem)');
+    els.leaves.forEach(l => l.setAttribute('fill', wilted ? 'var(--wilt)' : 'var(--leaf)'));
+    els.group.style.transform = wilted ? 'rotate(18deg)' : '';
+    els.group.classList.toggle('swaying', !wilted);
+  }
+
+  // ---------- sonido ----------
+  function chime(notes) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      notes.forEach((freq, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = freq;
+        const t = ctx.currentTime + i * 0.18;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+        o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.65);
+      });
+    } catch {}
+  }
+
+  // ---------- temporizador ----------
+  const fmt = ms => {
+    const s = Math.ceil(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+  function render() {
+    els.time.textContent = fmt(remainingMs);
+    const p = 1 - remainingMs / totalMs;
+    els.progress.style.width = `${p * 100}%`;
+    const running = phase === 'focus' || phase === 'break';
+    document.title = running ? `${fmt(remainingMs)} · ${phase === 'focus' ? '🌱' : '☕'}` : 'Pomodoro Plantita';
+    if (phase === 'focus' || (phase === 'paused' && pausedFrom === 'focus')) drawPlant(p);
+  }
+  function run(newPhase) {
+    phase = newPhase;
+    endAt = Date.now() + remainingMs;
+    clearInterval(tick);
+    tick = setInterval(() => {
+      remainingMs = Math.max(0, endAt - Date.now());
+      render();
+      if (remainingMs === 0) finish();
+    }, 250);
+    updateUI();
+  }
+  function finish() {
+    clearInterval(tick);
+    if (phase === 'focus') {
+      drawPlant(1); record('bloom'); chime([523, 659, 784, 1047]);
+      totalMs = remainingMs = BREAK_MIN * 60000;
+      document.body.classList.add('on-break');
+      run('break');
+      els.status.textContent = '¡Floreció! 🌸 Descanso de 5 minutos';
+    } else {
+      chime([784, 659]);
+      resetToIdle('Descanso terminado. ¿Otra semilla?');
+    }
+  }
+  function resetToIdle(msg) {
+    clearInterval(tick);
+    phase = 'idle'; pausedFrom = null;
+    totalMs = remainingMs = focusMin * 60000;
+    document.body.classList.remove('on-break');
+    drawPlant(0); render();
+    els.status.textContent = msg;
+    updateUI();
+  }
+  function updateUI() {
+    const labels = { idle: 'Empezar', focus: 'Pausar', break: 'Saltar descanso', paused: 'Continuar' };
+    els.start.textContent = labels[phase];
+    els.giveUp.disabled = !(phase === 'focus' || (phase === 'paused' && pausedFrom === 'focus'));
+    document.querySelectorAll('.mode').forEach(b => b.disabled = phase !== 'idle');
+    if (phase === 'focus') els.status.textContent = 'Creciendo… mantén el enfoque';
+    if (phase === 'paused') els.status.textContent = 'En pausa — la planta te espera';
+  }
+
+  els.start.addEventListener('click', () => {
+    if (phase === 'idle') { totalMs = remainingMs = focusMin * 60000; run('focus'); }
+    else if (phase === 'focus') { clearInterval(tick); pausedFrom = 'focus'; phase = 'paused'; updateUI(); render(); }
+    else if (phase === 'paused') { run(pausedFrom); }
+    else if (phase === 'break') { resetToIdle('Descanso saltado. ¿Otra semilla?'); }
+  });
+
+  els.giveUp.addEventListener('click', () => {
+    const p = 1 - remainingMs / totalMs;
+    clearInterval(tick);
+    drawPlant(Math.max(p, 0.2), true);
+    record('wilt'); chime([330, 262]);
+    phase = 'idle'; pausedFrom = null;
+    totalMs = remainingMs = focusMin * 60000;
+    els.time.textContent = fmt(remainingMs);
+    els.progress.style.width = '0';
+    document.title = 'Pomodoro Plantita';
+    updateUI();
+    els.status.textContent = 'La planta se marchitó 🥀 Inténtalo de nuevo';
+  });
+
+  document.querySelectorAll('.mode').forEach(btn => btn.addEventListener('click', () => {
+    if (phase !== 'idle') return;
+    document.querySelectorAll('.mode').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    focusMin = parseFloat(btn.dataset.min);
+    resetToIdle('Lista para plantar una semilla');
+  }));
+
+  // Espacio = empezar / pausar
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); els.start.click(); }
+  });
+
+  drawPlant(0); render(); renderGarden();
+})();
+</script>
+</body>
+</html>
