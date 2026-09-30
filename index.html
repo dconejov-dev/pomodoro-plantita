@@ -159,7 +159,9 @@
   let tick = null;
 
   // ---------- almacenamiento (tolerante a fallos) ----------
-  const todayKey = () => new Date().toISOString().slice(0, 10);
+  // fecha local (toISOString usa UTC y cambiaría de día antes de medianoche)
+  const dateKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayKey = () => dateKey(new Date());
   function load() {
     try { return JSON.parse(localStorage.getItem('plantita') || '{}'); } catch { return {}; }
   }
@@ -170,7 +172,7 @@
   function streakDays() {
     let n = 0; const d = new Date();
     if (!data.days[todayKey()]) d.setDate(d.getDate() - 1); // la racha sigue viva si aún no has hecho hoy
-    while (data.days[d.toISOString().slice(0, 10)]?.count) { n++; d.setDate(d.getDate() - 1); }
+    while (data.days[dateKey(d)]?.count) { n++; d.setDate(d.getDate() - 1); }
     return n;
   }
   function renderGarden() {
